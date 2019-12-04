@@ -17,11 +17,17 @@
 
 #ifdef GEGL_PROPERTIES
   property_boolean(antialias, _("Antialias"), FALSE)
+
+  property_boolean(transparent, _("Select Transparent"), TRUE)
+
   property_double(threshold, _("Threshold"), 0)
-  property_boolean(select_transparent, _("Select Transparent"), TRUE)
-  property_int(select_criterion, _("Select Criterion"), 0)
+
+  property_int(criterion, _("Select Criterion"), 0)
+
   property_boolean(diagonal_neighbors, _("Diagonal neighbors"), FALSE)
+
   property_double(x, _("X"), 0)
+
   property_double(y, _("Y"), 0)
 #else
 
@@ -61,30 +67,6 @@ extern "C"
 
 #define PIXELS_PER_THREAD \
   (/* each thread costs as much as */ 64.0 * 64.0 /* pixels */)
-#if 0
-enum
-{
-  PROP_0,
-  PROP_ANTIALIAS,
-  PROP_THRESHOLD,
-  PROP_SELECT_TRANSPARENT,
-  PROP_SELECT_CRITERION,
-  PROP_DIAGONAL_NEIGHBORS,
-  PROP_X,
-  PROP_Y
-};
-struct _GeglOperationBucketFill
-{
-  GeglOperationFilter  parent_instance;
-  gboolean antialias;
-  gfloat threshold;
-  GeglSelectCriterion select_criterion;
-  gboolean select_transparent;
-  gboolean diagonal_neighbors;
-  gint x;
-  gint y;
-};
-#endif
 
 typedef struct
 {
@@ -198,101 +180,7 @@ get_cached_region (GeglOperation       *self,
     g_warning("BucketFill::get_cached_region");
   return *gegl_operation_source_get_bounding_box (self, "input");
 }
-#if 0
-static void
-gegl_operation_bucket_fill_get_property (GObject    *object,
-                                         guint       property_id,
-                                         GValue     *value,
-                                         GParamSpec *pspec)
-{
-  GeglProperties *self = GEGL_PROPERTIES (object);
-  switch (property_id)
-    {
-    case PROP_ANTIALIAS:
-      g_value_set_boolean (value, self->antialias);
-      break;
 
-    case PROP_THRESHOLD:
-      g_value_set_float (value, self->threshold);
-      break;
-
-    case PROP_SELECT_TRANSPARENT:
-      g_value_set_boolean (value, self->select_transparent);
-      break;
-
-    case PROP_SELECT_CRITERION:
-      g_value_set_int (value, self->select_criterion);
-      break;
-
-    case PROP_DIAGONAL_NEIGHBORS:
-      g_value_set_boolean (value, self->diagonal_neighbors);
-      break;
-
-    case PROP_X:
-      g_value_set_int (value, self->x);
-      break;
-
-    case PROP_Y:
-      g_value_set_int (value, self->y);
-      break;
-
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
-      break;
-    }
-}
-
-static void
-gegl_operation_bucket_fill_set_property (GObject      *object,
-                                         guint         property_id,
-                                         const GValue *value,
-                                         GParamSpec   *pspec)
-{
-  GeglOperationBucketFill *self = GEGL_OPERATION_BUCKET_FILL (object);
-
-  switch (property_id)
-    {
-    case PROP_ANTIALIAS:
-      self->antialias = g_value_get_boolean (value);
-      g_object_notify (object, "antialias");
-      break;
-
-    case PROP_THRESHOLD:
-      self->threshold = g_value_get_float (value);
-      g_object_notify (object, "threshold");
-      break;
-
-    case PROP_SELECT_TRANSPARENT:
-      self->select_transparent = g_value_get_boolean (value);
-      g_object_notify (object, "select-transparent");
-      break;
-
-    case PROP_SELECT_CRITERION:
-      self->select_criterion = (GeglSelectCriterion)g_value_get_int (value);
-      g_object_notify (object, "select-criterion");
-      break;
-
-    case PROP_DIAGONAL_NEIGHBORS:
-      self->diagonal_neighbors = g_value_get_boolean (value);
-      g_object_notify (object, "diagonal-neighbors");
-      break;
-
-    case PROP_X:
-      self->x = g_value_get_int (value);
-      g_object_notify (object, "x");
-      break;
-
-    case PROP_Y:
-      self->y = g_value_get_int (value);
-      g_object_notify (object, "y");
-      break;
-
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
-      break;
-    }
-} 
-#endif
 static gboolean
 process (GeglOperation       *operation,
          GeglBuffer          *src_buffer, // input
@@ -303,8 +191,8 @@ process (GeglOperation       *operation,
   GeglProperties *self = GEGL_PROPERTIES (operation);
   gboolean antialias = self->antialias;
   gfloat threshold = self->threshold;
-  GeglSelectCriterion select_criterion = self->select_criterion;
-  gboolean select_transparent = self->select_transparent;
+  GeglSelectCriterion select_criterion = self->criterion;
+  gboolean select_transparent = self->transparent;
   gboolean diagonal_neighbors = self->diagonal_neighbors;
   gint x = int(self->x);
   gint y = int(self->y);
@@ -1272,6 +1160,7 @@ find_contiguous_region (GeglBuffer          *src_buffer,
   GQueue              *segment_queue;
   gfloat              *row = NULL;
 
+  g_warning("Select-Transparent:%d", select_transparent);
   src_extent = gegl_buffer_get_extent (src_buffer);
 
 #ifdef FETCH_ROW
@@ -1384,12 +1273,6 @@ line_art_queue_pixel (GQueue *queue,
 #endif
 
 /*  public functions  */
-#if 0
-G_DEFINE_TYPE (GeglOperationBucketFill, gegl_operation_bucket_fill,
-               GEGL_TYPE_OPERATION_FILTER)
-
-#define parent_class gegl_operation_bucket_fill_parent_class
-#endif
 
 /* GEGL graph for the test case. */
 static const gchar* reference_xml = "<?xml version='1.0' encoding='UTF-8'?>"
@@ -1442,45 +1325,7 @@ gegl_op_class_init (GeglOpClass *klass)
                                  "reference-image", "flood-output.png",
                                  "reference-composition", reference_xml,
                                  NULL);
-#if 0
-  object_class->set_property   = gegl_operation_bucket_fill_set_property;
-  object_class->get_property   = gegl_operation_bucket_fill_get_property;
 
-  g_object_class_install_property (object_class, PROP_ANTIALIAS,\
-                                   g_param_spec_boolean ("antialias", _("Antialias"), _("Antialias"),\
-                                   FALSE,\
-                                   (GParamFlags)(G_PARAM_READWRITE|G_PARAM_CONSTRUCT)));
-
-  g_object_class_install_property (object_class, PROP_THRESHOLD,\
-                                   g_param_spec_float ("threshold", _("Threshold"), _("Threshold"),\
-                                   0, 1, 0,\
-                                   (GParamFlags)(G_PARAM_READWRITE|G_PARAM_CONSTRUCT)));
-  
-  g_object_class_install_property (object_class, PROP_SELECT_TRANSPARENT,\
-                                   g_param_spec_boolean ("select-transparent", _("Select Transparent"), _("Select Transparent"),\
-                                   TRUE,\
-                                   (GParamFlags)(G_PARAM_READWRITE|G_PARAM_CONSTRUCT)));
-
-  g_object_class_install_property (object_class, PROP_SELECT_CRITERION,\
-                                   g_param_spec_int ("select-criterion", _("Select Criterion"), _("Select Criterion"),\
-                                   0, 11, 0,\
-                                   (GParamFlags)(G_PARAM_READWRITE|G_PARAM_CONSTRUCT)));
-
-  g_object_class_install_property (object_class, PROP_DIAGONAL_NEIGHBORS,\
-                                   g_param_spec_boolean ("diagonal-neighbors", _("Diagonal Neighbors"), _("Diagonal Neighbors"),\
-                                   FALSE,\
-                                   (GParamFlags)(G_PARAM_READWRITE|G_PARAM_CONSTRUCT)));
-
-  g_object_class_install_property (object_class, PROP_X,\
-                                   g_param_spec_int ("x", _("X"), _("X"),\
-                                   0, ~((int)0), 0,\
-                                   (GParamFlags)(G_PARAM_READWRITE|G_PARAM_CONSTRUCT)));
-
-  g_object_class_install_property (object_class, PROP_Y,\
-                                   g_param_spec_int ("y", _("Y"), _("Y"),\
-                                   0, ~((int)0), 0,\
-                                   (GParamFlags)(G_PARAM_READWRITE|G_PARAM_CONSTRUCT)));
-#endif
   operation_class->prepare                 = prepare;
   operation_class->get_required_for_output = get_required_for_output;
   operation_class->get_cached_region       = get_cached_region;
